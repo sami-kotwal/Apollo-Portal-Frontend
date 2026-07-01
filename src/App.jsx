@@ -312,6 +312,38 @@ function StatusPill({ status }) {
   return <span className={`status-pill ${status.toLowerCase()}`}><i />{status}</span>
 }
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)').matches
+}
+
+function shouldIgnoreRowTap(event) {
+  return Boolean(event.target.closest('a, button, input, label, select, textarea'))
+}
+
+function DetailItem({ label, children }) {
+  return <div className="detail-item"><span>{label}</span><strong>{children}</strong></div>
+}
+
+function MobileDetailPopup({ title, subtitle, icon = 'globe', onClose, children, actions }) {
+  return (
+    <div className="mobile-detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="mobile-detail-popup" role="dialog" aria-modal="true" aria-labelledby="mobile-detail-title">
+        <div className="mobile-detail-heading">
+          <span className="summary-icon blue"><Icon name={icon} size={18} /></span>
+          <div>
+            <span className="eyebrow">DETAILS</span>
+            <h2 id="mobile-detail-title">{title}</h2>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close"><Icon name="close" size={18} /></button>
+        </div>
+        <div className="mobile-detail-grid">{children}</div>
+        {actions && <div className="mobile-detail-actions">{actions}</div>}
+      </section>
+    </div>
+  )
+}
+
 function Dashboard({ setActivePage, onOpenNotifications, domains, websites, subdomains, notifications }) {
   const expiredCount = domains.filter((domain) => getDomainStatus(domain) === 'Expired').length
   const expiringCount = domains.filter((domain) => getDomainStatus(domain) === 'Expiring').length
@@ -415,6 +447,7 @@ function DomainFormModal({ domain, onClose, onSave, defaultDeveloper = 'Mahad' }
 
 function DomainTable({ items, websites, emptyMessage = 'No domains found.', header, onEdit, onTag, onDelete, canManage = false, searchQuery = '', onSearchChange = () => {} }) {
   const [openMenu, setOpenMenu] = useState(null)
+  const [selectedDomain, setSelectedDomain] = useState(null)
   const filtered = useMemo(() => items.filter((domain) => {
     const term = searchQuery.toLowerCase()
     return [
@@ -436,7 +469,10 @@ function DomainTable({ items, websites, emptyMessage = 'No domains found.', head
       <div className="domains-table">
         <div className="table-row table-head domain-table-row"><span>#</span><span>Domain</span><span>Status</span><span>Hosting</span><span>Expiration</span><span>Email</span><span>{canManage ? 'Actions' : ''}</span></div>
         {filtered.map((domain, index) => (
-          <div className="table-row domain-table-row" key={domain.id}>
+          <div className="table-row domain-table-row" key={domain.id} onClick={(event) => {
+            if (!isMobileViewport() || shouldIgnoreRowTap(event)) return
+            setSelectedDomain(domain)
+          }}>
             <span className="row-number">{index + 1}</span>
             <div className="domain-name-cell"><span className="domain-symbol"><Icon name="globe" size={18} /></span><div><strong>{domain.name}</strong><small>{websites.find((website) => website.domain === domain.name)?.status || 'Not tagged'}</small></div></div>
             <StatusPill status={getDomainStatus(domain)} />
@@ -465,6 +501,29 @@ function DomainTable({ items, websites, emptyMessage = 'No domains found.', head
         ))}
       </div>
       {filtered.length === 0 && <div className="empty-state">{searchQuery ? `No domains match "${searchQuery}".` : emptyMessage}</div>}
+      {selectedDomain && (
+        <MobileDetailPopup
+          title={selectedDomain.name}
+          subtitle={websites.find((website) => website.domain === selectedDomain.name)?.status || 'Not tagged'}
+          icon="globe"
+          onClose={() => setSelectedDomain(null)}
+          actions={canManage && (
+            <>
+              <button className="mini-action edit" onClick={() => { onEdit(selectedDomain); setSelectedDomain(null) }}>Edit</button>
+              <button className="mini-action delete" onClick={() => { onDelete(selectedDomain); setSelectedDomain(null) }}>Delete</button>
+              <button className="mini-action edit" onClick={() => { onTag(selectedDomain, 'Live'); setSelectedDomain(null) }}>Mark live</button>
+              <button className="mini-action delete" onClick={() => { onTag(selectedDomain, 'Down'); setSelectedDomain(null) }}>Mark down</button>
+            </>
+          )}
+        >
+          <DetailItem label="Status"><StatusPill status={getDomainStatus(selectedDomain)} /></DetailItem>
+          <DetailItem label="Hosting">{selectedDomain.hosting}</DetailItem>
+          <DetailItem label="Expiration">{formatDate(selectedDomain.expiry)}</DetailItem>
+          <DetailItem label="Email accounts">{selectedDomain.emailCount || 0}</DetailItem>
+          <DetailItem label="Developer">{selectedDomain.developer || 'Not assigned'}</DetailItem>
+          <DetailItem label="Website status">{selectedDomain.websiteStatus || 'None'}</DetailItem>
+        </MobileDetailPopup>
+      )}
     </section>
   )
 }
@@ -592,6 +651,7 @@ function SubdomainFormModal({ subdomain, onClose, onSave }) {
 function Subdomains({ items, onEdit, onDelete, onLogoUpload, canManage = false, searchQuery = '', onSearchChange = () => {} }) {
   const [personFilter, setPersonFilter] = useState('all')
   const [summaryFilter, setSummaryFilter] = useState('all')
+  const [selectedSubdomain, setSelectedSubdomain] = useState(null)
   const hostingerCount = items.filter((item) => item.hosting === 'Hostinger').length
   const verpexCount = items.filter((item) => item.hosting === 'Verpex').length
   const alertItems = items.filter((item) => daysSince(item.projectDate) > 30)
@@ -664,7 +724,10 @@ function Subdomains({ items, onEdit, onDelete, onLogoUpload, canManage = false, 
         <div className="domains-table">
           <div className="table-row table-head"><span>#</span><span>Subdomain</span><span>Hosting</span><span>PM</span><span>Assign to</span><span>Date</span><span>{canManage ? 'Actions' : ''}</span></div>
           {visible.map((item, index) => (
-            <div className="table-row" key={item.id}>
+            <div className="table-row" key={item.id} onClick={(event) => {
+              if (!isMobileViewport() || shouldIgnoreRowTap(event)) return
+              setSelectedSubdomain(item)
+            }}>
               <span className="row-number">{index + 1}</span>
               <div className="domain-name-cell">
                 <label className={`website-logo-upload ${canManage ? '' : 'readonly'}`} title={canManage ? 'Upload subdomain image' : 'View subdomain image'}>
@@ -690,6 +753,28 @@ function Subdomains({ items, onEdit, onDelete, onLogoUpload, canManage = false, 
           {visible.length === 0 && <div className="empty-state">{summaryFilter === 'alerts' ? 'No subdomains older than one month.' : searchQuery || personFilter !== 'all' ? 'No matching subdomain projects.' : 'No subdomains added yet.'}</div>}
         </div>
       </section>
+      {selectedSubdomain && (
+        <MobileDetailPopup
+          title={selectedSubdomain.name}
+          subtitle={`${selectedSubdomain.pm} · ${selectedSubdomain.assignedTo}`}
+          icon="activity"
+          onClose={() => setSelectedSubdomain(null)}
+          actions={(
+            <>
+              <a className="mobile-detail-link" href={homepageUrl(selectedSubdomain)} target="_blank" rel="noreferrer">Open website</a>
+              {canManage && <button className="mini-action edit" onClick={() => { onEdit(selectedSubdomain); setSelectedSubdomain(null) }}>Edit</button>}
+              {canManage && <button className="mini-action delete" onClick={() => { onDelete(selectedSubdomain); setSelectedSubdomain(null) }}>Delete</button>}
+            </>
+          )}
+        >
+          <DetailItem label="Hosting"><span className="hosting-badge">{selectedSubdomain.hosting}</span></DetailItem>
+          <DetailItem label="PM">{selectedSubdomain.pm}</DetailItem>
+          <DetailItem label="Assign to">{selectedSubdomain.assignedTo}</DetailItem>
+          <DetailItem label="Project date">{formatDate(selectedSubdomain.projectDate)}</DetailItem>
+          <DetailItem label="Age">{daysSince(selectedSubdomain.projectDate)} days</DetailItem>
+          <DetailItem label="Website URL">{homepageUrl(selectedSubdomain)}</DetailItem>
+        </MobileDetailPopup>
+      )}
     </>
   )
 }
@@ -698,6 +783,7 @@ function Websites({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Mah
   const [filter, setFilter] = useState('all')
   const [developerFilter, setDeveloperFilter] = useState('all')
   const [openMenu, setOpenMenu] = useState(null)
+  const [selectedWebsite, setSelectedWebsite] = useState(null)
   const websites = domains.filter((domain) => domain.websiteStatus === 'Live' || domain.websiteStatus === 'Down')
   const hostingerCount = websites.filter((domain) => domain.websiteStatus === 'Live' && domain.hosting.toLowerCase() === 'hostinger').length
   const verpexCount = websites.filter((domain) => domain.websiteStatus === 'Live' && domain.hosting.toLowerCase() === 'verpex').length
@@ -774,7 +860,10 @@ function Websites({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Mah
         <div className="domains-table">
           <div className="table-row table-head"><span>#</span><span>Website</span><span>Status</span><span>Hosting</span><span>Developer</span><span>Backup</span><span>Emails</span><span>{canManage ? 'Actions' : ''}</span></div>
           {visible.map((domain, index) => (
-            <div className="table-row" key={domain.id}>
+            <div className="table-row" key={domain.id} onClick={(event) => {
+              if (!isMobileViewport() || shouldIgnoreRowTap(event)) return
+              setSelectedWebsite(domain)
+            }}>
               <span className="row-number">{index + 1}</span>
               <div className="domain-name-cell">
                 <label className={`website-logo-upload ${domain.websiteStatus === 'Down' ? 'danger' : ''} ${canManage ? '' : 'readonly'}`} title={canManage ? 'Upload website image' : 'View website image'}>
@@ -822,11 +911,36 @@ function Websites({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Mah
           {visible.length === 0 && <div className="empty-state">{searchQuery || developerFilter !== 'all' ? 'No websites match this search or developer.' : 'No websites in this filter.'}</div>}
         </div>
       </section>
+      {selectedWebsite && (
+        <MobileDetailPopup
+          title={selectedWebsite.name}
+          subtitle={`${selectedWebsite.emailCount || 0} email accounts`}
+          icon="monitor"
+          onClose={() => setSelectedWebsite(null)}
+          actions={(
+            <>
+              <a className="mobile-detail-link" href={homepageUrl(selectedWebsite)} target="_blank" rel="noreferrer">Open website</a>
+              {canManage && <button className="mini-action edit" onClick={() => { onEdit(selectedWebsite); setSelectedWebsite(null) }}>Edit</button>}
+              {canManage && <button className="mini-action delete" onClick={() => { onDelete(selectedWebsite); setSelectedWebsite(null) }}>Delete</button>}
+              {canManage && <button className="mini-action edit" onClick={() => { onUpdate(selectedWebsite, { status: 'Live' }); setSelectedWebsite(null) }}>Mark live</button>}
+              {canManage && <button className="mini-action delete" onClick={() => { onUpdate(selectedWebsite, { status: 'Down' }); setSelectedWebsite(null) }}>Mark down</button>}
+            </>
+          )}
+        >
+          <DetailItem label="Status"><StatusPill status={selectedWebsite.websiteStatus} /></DetailItem>
+          <DetailItem label="Hosting"><span className="hosting-badge">{selectedWebsite.hosting}</span></DetailItem>
+          <DetailItem label="Developer">{selectedWebsite.developer || defaultDeveloper}</DetailItem>
+          <DetailItem label="Backup">{selectedWebsite.backupEnabled ? 'Yes' : 'No'}</DetailItem>
+          <DetailItem label="Emails">{selectedWebsite.emailCount || 0}</DetailItem>
+          <DetailItem label="Website URL">{homepageUrl(selectedWebsite)}</DetailItem>
+        </MobileDetailPopup>
+      )}
     </>
   )
 }
 
 function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Mahad', canManage = false, searchQuery = '', onSearchChange = () => {} }) {
+  const [selectedPortfolio, setSelectedPortfolio] = useState(null)
   const liveWebsites = domains.filter((domain) => domain.websiteStatus === 'Live' && (domain.developer || 'Mahad') === defaultDeveloper)
   const visible = liveWebsites.filter((domain) => {
     const term = searchQuery.toLowerCase()
@@ -864,7 +978,10 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
         <div className="domains-table">
           <div className="table-row table-head"><span>#</span><span>Website</span><span>Care update</span><span>Wordfence</span><span>Recaptcha</span><span>Backup</span><span>Developer</span><span>{canManage ? 'Actions' : ''}</span></div>
           {visible.map((domain, index) => (
-            <div className="table-row" key={domain.id}>
+            <div className="table-row" key={domain.id} onClick={(event) => {
+              if (!isMobileViewport() || shouldIgnoreRowTap(event)) return
+              setSelectedPortfolio(domain)
+            }}>
               <span className="row-number">{index + 1}</span>
               <div className="domain-name-cell">
                 <span className="domain-symbol"><Icon name="monitor" size={18} /></span>
@@ -903,6 +1020,29 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
           {visible.length === 0 && <div className="empty-state">{searchQuery ? 'No live websites match this search.' : 'No live websites in portfolio yet.'}</div>}
         </div>
       </section>
+      {selectedPortfolio && (
+        <MobileDetailPopup
+          title={selectedPortfolio.name}
+          subtitle={selectedPortfolio.hosting}
+          icon="portfolio"
+          onClose={() => setSelectedPortfolio(null)}
+          actions={(
+            <>
+              <a className="mobile-detail-link" href={homepageUrl(selectedPortfolio)} target="_blank" rel="noreferrer">Open website</a>
+              {canManage && <button className="mini-action edit" onClick={() => { onEdit(selectedPortfolio); setSelectedPortfolio(null) }}>Edit</button>}
+              {canManage && <button className="mini-action delete" onClick={() => { onDelete(selectedPortfolio); setSelectedPortfolio(null) }}>Delete</button>}
+            </>
+          )}
+        >
+          <DetailItem label="Hosting"><span className="hosting-badge">{selectedPortfolio.hosting}</span></DetailItem>
+          <DetailItem label="Care update">{careStatus(selectedPortfolio) === 'yes' ? 'Yes' : 'No'}</DetailItem>
+          <DetailItem label="Care update date">{selectedPortfolio.careUpdateAt ? formatDate(dateInputValue(selectedPortfolio.careUpdateAt)) : 'Default yes'}</DetailItem>
+          <DetailItem label="Wordfence">{dateInputValue(selectedPortfolio.wordfenceDate) ? formatDate(dateInputValue(selectedPortfolio.wordfenceDate)) : 'Not set'}</DetailItem>
+          <DetailItem label="Recaptcha">{selectedPortfolio.recaptchaEnabled ? 'Yes' : 'No'}</DetailItem>
+          <DetailItem label="Backup">{selectedPortfolio.backupEnabled ? 'Yes' : 'No'}</DetailItem>
+          <DetailItem label="Developer">{selectedPortfolio.developer || defaultDeveloper}</DetailItem>
+        </MobileDetailPopup>
+      )}
     </>
   )
 }
