@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const API_URL = isLocalhost
+  ? 'http://localhost:5000'
+  : import.meta.env.VITE_API_URL || window.location.origin
 
 function formatDate(dateValue) {
   if (!dateValue) return 'Not set'
@@ -1099,8 +1102,228 @@ function NotificationPopup({ items, setItems, onClose, onNavigate }) {
   )
 }
 
+function homepageUrl(item) {
+  if (item.websiteUrl) return /^https?:\/\//i.test(item.websiteUrl) ? item.websiteUrl : `https://${item.websiteUrl}`
+  return `https://${item.name}`
+}
+
+async function parseApiResponse(response, fallbackMessage) {
+  const contentType = response.headers.get('content-type') || ''
+  const data = contentType.includes('application/json')
+    ? await response.json()
+    : { message: await response.text() }
+
+  if (!response.ok) {
+    throw new Error(data.message || fallbackMessage)
+  }
+
+  return data
+}
+
+function PublicPMPage({ onLoginClick }) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [domains, setDomains] = useState([])
+  const [subdomains, setSubdomains] = useState([])
+  const [activeView, setActiveView] = useState('live')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+
+    function loadOverview({ silent = false } = {}) {
+      if (!silent) setLoading(true)
+      return fetch(`${API_URL}/api/public/overview`, { cache: 'no-store' })
+      .then((response) => parseApiResponse(response, 'Unable to load overview.'))
+      .catch(async (publicError) => {
+        const token = localStorage.getItem('aytech-token')
+        if (!token) throw publicError
+
+        const [domainResponse, subdomainResponse] = await Promise.all([
+          fetch(`${API_URL}/api/domains`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
+          fetch(`${API_URL}/api/subdomains`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
+        ])
+        const [domainData, subdomainData] = await Promise.all([
+          parseApiResponse(domainResponse, 'Unable to load domains.'),
+          parseApiResponse(subdomainResponse, 'Unable to load subdomains.'),
+        ])
+        return { domains: domainData.domains || [], subdomains: subdomainData.subdomains || [] }
+      })
+      .then((data) => {
+        if (!mounted) return
+        setDomains(data.domains || [])
+        setSubdomains(data.subdomains || [])
+        setError('')
+      })
+      .catch((requestError) => {
+        if (!mounted) return
+        const hasHtmlResponse = requestError.message.trim().startsWith('<')
+        setError(requestError.message === 'Failed to fetch'
+          ? 'Backend se connection nahi ho raha. Backend server start karein.'
+          : hasHtmlResponse
+            ? 'Backend par public overview route abhi deploy nahi hua. Backend redeploy karein.'
+          : `${requestError.message} Backend deploy/update check karein.`)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    }
+
+    function refreshOnFocus() {
+      loadOverview({ silent: true })
+    }
+
+    loadOverview()
+    const refreshTimer = window.setInterval(() => loadOverview({ silent: true }), 30000)
+    window.addEventListener('focus', refreshOnFocus)
+
+    return () => {
+      mounted = false
+      window.clearInterval(refreshTimer)
+      window.removeEventListener('focus', refreshOnFocus)
+    }
+  }, [])
+
+  const liveWebsites = domains.filter((domain) => domain.websiteStatus === 'Live')
+  const downWebsites = domains.filter((domain) => domain.websiteStatus === 'Down')
+  const expiredDomains = domains.filter((domain) => getDomainStatus(domain) === 'Expired')
+  const expiringSoonDomains = domains.filter((domain) => getDomainStatus(domain) === 'Expiring')
+  const dataSets = {
+    live: liveWebsites,
+    down: downWebsites,
+    expired: expiredDomains,
+    expiring: expiringSoonDomains,
+    subdomains,
+  }
+  const searchableViews = [
+    { id: 'live', items: liveWebsites },
+    { id: 'down', items: downWebsites },
+    { id: 'expired', items: expiredDomains },
+    { id: 'expiring', items: expiringSoonDomains },
+    { id: 'subdomains', items: subdomains },
+  ]
+  const activeItems = dataSets[activeView].filter((item) => {
+    const term = search.trim().toLowerCase()
+    if (!term) return true
+    return [item.name, item.hosting, item.developer, item.pm, item.assignedTo, item.websiteStatus]
+      .some((value) => String(value || '').toLowerCase().includes(term))
+  })
+  const cards = [
+    { id: 'live', label: 'Live websites', value: liveWebsites.length, icon: 'monitor', tone: 'green' },
+    { id: 'down', label: 'Down websites', value: downWebsites.length, icon: 'activity', tone: 'red' },
+    { id: 'expired', label: 'Expired domains', value: expiredDomains.length, icon: 'archive', tone: 'orange' },
+    { id: 'subdomains', label: 'Subdomains', value: subdomains.length, icon: 'layers', tone: 'blue' },
+  ]
+  const activeTitle = [...cards, { id: 'expiring', label: 'Expiring soon' }].find((card) => card.id === activeView)?.label || 'Overview'
+
+  function matchesPublicSearch(item, term) {
+    return [item.name, item.hosting, item.developer, item.pm, item.assignedTo, item.websiteStatus]
+      .some((value) => String(value || '').toLowerCase().includes(term))
+  }
+
+  function handlePublicSearch(value) {
+    setSearch(value)
+    const term = value.trim().toLowerCase()
+    if (term.length < 2) return
+
+    const exactMatchView = searchableViews.find(({ items }) => (
+      items.some((item) => String(item.name || '').toLowerCase().includes(term))
+    ))
+    const broadMatchView = searchableViews.find(({ items }) => (
+      items.some((item) => matchesPublicSearch(item, term))
+    ))
+    const nextView = exactMatchView || broadMatchView
+
+    if (nextView && nextView.id !== activeView) {
+      setActiveView(nextView.id)
+    }
+  }
+
+  return (
+    <main className="public-page">
+      <header className="public-header">
+        <AytechLogo />
+        <div className="public-global-search">
+          <Icon name="search" size={18} />
+          <input value={search} onChange={(event) => handlePublicSearch(event.target.value)} placeholder="Search domain or subdomain..." />
+        </div>
+        <button className="public-login-btn" onClick={onLoginClick}>Login <Icon name="arrow" size={16} /></button>
+      </header>
+
+      <section className="public-hero">
+        <div>
+          <span className="eyebrow">PM VIEW ONLY</span>
+          <h1>AY TECH Website Status Board</h1>
+          <p>Live websites, down websites, expired domains, and subdomains are shown directly from the internal database in read-only mode.</p>
+        </div>
+        <button className={`public-status-card public-status-button ${activeView === 'expiring' ? 'active' : ''}`} onClick={() => setActiveView('expiring')}>
+          <span>Expiring soon</span>
+          <strong>{expiringSoonDomains.length}</strong>
+          <small>Within the next 30 days</small>
+        </button>
+      </section>
+
+      <section className="public-card-grid" aria-label="Website status filters">
+        {cards.map((card) => (
+          <button key={card.id} className={`public-stat-card ${activeView === card.id ? 'active' : ''}`} onClick={() => setActiveView(card.id)}>
+            <span className={`summary-icon ${card.tone}`}><Icon name={card.icon} size={19} /></span>
+            <small>{card.label}</small>
+            <strong>{card.value}</strong>
+          </button>
+        ))}
+      </section>
+
+      <section className="public-list-panel">
+        <div className="public-list-heading">
+          <div>
+            <span className="eyebrow">CONNECTED LIST</span>
+            <h2>{activeTitle}</h2>
+          </div>
+          <div className="public-search"><Icon name="search" size={17} /><input value={search} onChange={(event) => handlePublicSearch(event.target.value)} placeholder="Search records..." /></div>
+        </div>
+
+        {loading && <div className="empty-state">Loading connected records...</div>}
+        {error && <div className="login-error public-error">{error}</div>}
+        {!loading && !error && (
+          <div className="public-table">
+            <div className="public-table-row public-table-head">
+              <span>#</span><span>Name</span><span>Hosting</span><span>Status</span><span>Owner</span><span>Date</span><span>Open</span>
+            </div>
+            {activeItems.map((item, index) => (
+              <div className="public-table-row" key={item.id}>
+                <span>{index + 1}</span>
+                <div className="public-name-cell">
+                  <span className={`summary-icon ${activeView === 'down' ? 'red' : activeView === 'expired' || activeView === 'expiring' ? 'orange' : 'blue'}`}>
+                    <Icon name={activeView === 'subdomains' ? 'layers' : 'globe'} size={16} />
+                  </span>
+                  <strong>{item.name}</strong>
+                </div>
+                <span className="hosting-badge">{item.hosting}</span>
+                <span>{activeView === 'subdomains' ? 'Subdomain' : <StatusPill status={activeView === 'expired' ? 'Expired' : activeView === 'expiring' ? 'Expiring' : item.websiteStatus} />}</span>
+                <span className="table-muted">{activeView === 'subdomains' ? `${item.pm} / ${item.assignedTo}` : item.developer || 'Mahad'}</span>
+                <span className="table-muted">{
+                  activeView === 'expired' || activeView === 'expiring'
+                    ? formatDate(item.expiry)
+                    : activeView === 'subdomains'
+                      ? formatDate(item.projectDate)
+                      : activeView === 'down'
+                        ? item.downSince ? formatDate(String(item.downSince).slice(0, 10)) : 'Not set'
+                        : item.liveSince ? formatDate(String(item.liveSince).slice(0, 10)) : 'Not set'
+                }</span>
+                <a className="public-open-link" href={homepageUrl(item)} target="_blank" rel="noreferrer">View</a>
+              </div>
+            ))}
+            {activeItems.length === 0 && <div className="empty-state">No records found in this section.</div>}
+          </div>
+        )}
+      </section>
+    </main>
+  )
+}
+
 function App() {
   const [session, setSession] = useState(null)
+  const [routePath, setRoutePath] = useState(() => window.location.pathname)
   const [authNotice, setAuthNotice] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
@@ -1115,6 +1338,20 @@ function App() {
   const [editingDomain, setEditingDomain] = useState(undefined)
   const [editingSubdomain, setEditingSubdomain] = useState(undefined)
   const loggedInDeveloper = session?.user ? userFirstName(session.user) : ''
+
+  function navigate(path) {
+    window.history.pushState({}, '', path)
+    setRoutePath(path)
+  }
+
+  useEffect(() => {
+    function handlePopState() {
+      setRoutePath(window.location.pathname)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('aytech-token')
@@ -1245,6 +1482,7 @@ function App() {
     localStorage.setItem('aytech-token', data.token)
     setAuthNotice('')
     setSession(data)
+    navigate('/app')
   }
 
   function expireSession(message = 'Your session expired. Please sign in again.') {
@@ -1428,6 +1666,7 @@ function App() {
     }
   }
 
+  if (routePath === '/') return <PublicPMPage onLoginClick={() => navigate('/login')} />
   if (authLoading) return <div className="auth-loader"><div className="brand-mark"><Icon name="zap" size={22} /></div><span>Checking session...</span></div>
   if (!session) return <Login onLogin={handleLogin} notice={authNotice} />
 
