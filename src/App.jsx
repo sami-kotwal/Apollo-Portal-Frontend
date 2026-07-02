@@ -1287,7 +1287,7 @@ function PublicPMPage({ onLoginClick }) {
         {!loading && !error && (
           <div className="public-table">
             <div className="public-table-row public-table-head">
-              <span>#</span><span>Name</span><span>Hosting</span><span>Status</span><span>Owner</span><span>Date</span><span>Open</span>
+              <span>#</span><span>Name</span><span>Hosting</span><span>Status</span><span>Owner</span><span>Emails</span><span>Date</span><span>Open</span>
             </div>
             {activeItems.map((item, index) => (
               <div className="public-table-row" key={item.id}>
@@ -1301,6 +1301,9 @@ function PublicPMPage({ onLoginClick }) {
                 <span className="hosting-badge">{item.hosting}</span>
                 <span>{activeView === 'subdomains' ? 'Subdomain' : <StatusPill status={activeView === 'expired' ? 'Expired' : activeView === 'expiring' ? 'Expiring' : item.websiteStatus} />}</span>
                 <span className="table-muted">{activeView === 'subdomains' ? `${item.pm} / ${item.assignedTo}` : item.developer || 'Mahad'}</span>
+                <span className={activeView === 'subdomains' ? 'table-muted' : `email-state ${item.emailCount > 0 ? 'enabled' : 'disabled'}`}>
+                  {activeView === 'subdomains' ? '-' : <><Icon name="mail" size={13} /><span>{item.emailCount || 0}</span></>}
+                </span>
                 <span className="table-muted">{
                   activeView === 'expired' || activeView === 'expiring'
                     ? formatDate(item.expiry)

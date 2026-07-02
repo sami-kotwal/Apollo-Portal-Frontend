@@ -1486,12 +1486,12 @@ body {
 }
 
 .public-table-row {
-  min-width: 920px;
+  min-width: 1000px;
   min-height: 66px;
   padding: 0 18px;
   border-bottom: 1px solid rgba(76, 102, 160, .18);
   display: grid;
-  grid-template-columns: 38px minmax(240px, 1.5fr) .75fr .75fr 1fr .85fr 64px;
+  grid-template-columns: 38px minmax(240px, 1.5fr) .75fr .75fr 1fr .65fr .85fr 64px;
   gap: 14px;
   align-items: center;
   color: #dce4f8;
