@@ -32,8 +32,8 @@ function dateInputValue(dateValue) {
   return dateValue ? String(dateValue).slice(0, 10) : ''
 }
 
-function isPastFifteenDays(dateValue) {
-  return Boolean(dateValue) && daysSince(dateValue) >= 15
+function isPastThirtyDays(dateValue) {
+  return Boolean(dateValue) && daysSince(dateValue) >= 30
 }
 
 function getDomainStatus(domain) {
@@ -949,8 +949,8 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
     const term = searchQuery.toLowerCase()
     return [domain.name, domain.hosting, domain.developer].some((value) => String(value || '').toLowerCase().includes(term))
   })
-  const careDueCount = liveWebsites.filter((domain) => !domain.careUpdateEnabled || isPastFifteenDays(domain.careUpdateAt)).length
-  const wordfenceDueCount = liveWebsites.filter((domain) => isPastFifteenDays(domain.wordfenceDate)).length
+  const careDueCount = liveWebsites.filter((domain) => !domain.careUpdateEnabled || isPastThirtyDays(domain.careUpdateAt)).length
+  const wordfenceDueCount = liveWebsites.filter((domain) => isPastThirtyDays(domain.wordfenceDate)).length
   const recaptchaCount = liveWebsites.filter((domain) => domain.recaptchaEnabled).length
 
   function homepageUrl(domain) {
@@ -959,7 +959,7 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
   }
 
   function careStatus(domain) {
-    return domain.careUpdateEnabled && !isPastFifteenDays(domain.careUpdateAt) ? 'yes' : 'no'
+    return domain.careUpdateEnabled && !isPastThirtyDays(domain.careUpdateAt) ? 'yes' : 'no'
   }
 
   return (
@@ -995,11 +995,11 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
                   <option value="yes">Yes</option>
                   <option value="no">No</option>
                 </select>
-                <small>{domain.careUpdateAt ? `Last ${formatDate(dateInputValue(domain.careUpdateAt))}` : 'Default yes'}</small>
+                <small>{domain.careUpdateAt ? `Last ${formatDate(dateInputValue(domain.careUpdateAt))}` : 'Default no'}</small>
               </div>
               <div className="portfolio-control">
-                <input className={isPastFifteenDays(domain.wordfenceDate) ? 'needs-update' : ''} type="date" value={dateInputValue(domain.wordfenceDate)} onChange={(event) => onUpdate(domain, { wordfenceDate: event.target.value })} />
-                <small>{isPastFifteenDays(domain.wordfenceDate) ? 'Update required' : '15 day reminder'}</small>
+                <input className={isPastThirtyDays(domain.wordfenceDate) ? 'needs-update' : ''} type="date" value={dateInputValue(domain.wordfenceDate)} onChange={(event) => onUpdate(domain, { wordfenceDate: event.target.value })} />
+                <small>{isPastThirtyDays(domain.wordfenceDate) ? 'Update required' : '30 day reminder'}</small>
               </div>
               <select className="inline-select" value={domain.recaptchaEnabled ? 'yes' : 'no'} onChange={(event) => onUpdate(domain, { recaptchaEnabled: event.target.value === 'yes' })}>
                 <option value="yes">Yes</option>
@@ -1039,7 +1039,7 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
         >
           <DetailItem label="Hosting"><span className="hosting-badge">{selectedPortfolio.hosting}</span></DetailItem>
           <DetailItem label="Care update">{careStatus(selectedPortfolio) === 'yes' ? 'Yes' : 'No'}</DetailItem>
-          <DetailItem label="Care update date">{selectedPortfolio.careUpdateAt ? formatDate(dateInputValue(selectedPortfolio.careUpdateAt)) : 'Default yes'}</DetailItem>
+          <DetailItem label="Care update date">{selectedPortfolio.careUpdateAt ? formatDate(dateInputValue(selectedPortfolio.careUpdateAt)) : 'Default no'}</DetailItem>
           <DetailItem label="Wordfence">{dateInputValue(selectedPortfolio.wordfenceDate) ? formatDate(dateInputValue(selectedPortfolio.wordfenceDate)) : 'Not set'}</DetailItem>
           <DetailItem label="Recaptcha">{selectedPortfolio.recaptchaEnabled ? 'Yes' : 'No'}</DetailItem>
           <DetailItem label="Backup">{selectedPortfolio.backupEnabled ? 'Yes' : 'No'}</DetailItem>
@@ -1445,7 +1445,7 @@ function App() {
       .filter((domain) => (
         domain.websiteStatus === 'Live' &&
         (domain.developer || 'Mahad') === loggedInDeveloper &&
-        (!domain.careUpdateEnabled || isPastFifteenDays(domain.careUpdateAt))
+        (!domain.careUpdateEnabled || isPastThirtyDays(domain.careUpdateAt))
       ))
       .map((domain) => ({
         id: `care-update-${domain.id}-${dateInputValue(domain.careUpdateAt) || 'new'}`,
@@ -1460,13 +1460,13 @@ function App() {
       .filter((domain) => (
         domain.websiteStatus === 'Live' &&
         (domain.developer || 'Mahad') === loggedInDeveloper &&
-        isPastFifteenDays(domain.wordfenceDate)
+        isPastThirtyDays(domain.wordfenceDate)
       ))
       .map((domain) => ({
         id: `wordfence-update-${domain.id}-${dateInputValue(domain.wordfenceDate)}`,
         type: 'warning',
         title: 'Wordfence update required',
-        text: `${domain.name} Wordfence date is over 15 days old. Please update it.`,
+        text: `${domain.name} Wordfence date is over 30 days old. Please update it.`,
         time: 'Today',
         unread: true,
         targetPage: 'portfolio',

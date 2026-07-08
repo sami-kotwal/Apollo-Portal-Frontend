@@ -239,7 +239,25 @@ button { border: 0; }
 .capacity-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3478ff, #a84ee8 58%, #ff3b75); box-shadow: 0 0 12px rgba(91, 96, 255, .45); transition: width .35s ease; }
 .capacity-track.verpex-track i { background: linear-gradient(90deg, #1fbf86, #37c7d4 55%, #427dff); box-shadow: 0 0 12px rgba(43, 201, 166, .38); }
 .capacity-content > p { margin: 5px 0 0; color: #aebad2; font-size: 7px; }
-.subdomain-manager .table-row { grid-template-columns: 35px 2fr .8fr .8fr .9fr .9fr 105px; }
+.subdomain-manager .table-row { grid-template-columns: 35px minmax(0, 2fr) minmax(72px, .8fr) minmax(72px, .8fr) minmax(82px, .9fr) minmax(96px, .9fr) 105px; }
+.subdomain-manager .domain-name-cell { min-width: 0; }
+.subdomain-manager .domain-name-cell > div { min-width: 0; max-width: 100%; }
+.subdomain-manager .website-home-link {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.subdomain-manager .website-home-link svg {
+  display: inline;
+  width: 12px;
+  min-width: 12px;
+  margin-left: 4px;
+  vertical-align: -2px;
+}
 .website-manager .table-row { grid-template-columns: 35px 2fr .7fr .8fr .9fr 58px 58px 145px; }
 .portfolio-manager .table-row { grid-template-columns: 35px 2fr 1fr 1fr .75fr 58px .8fr 120px; }
 .portfolio-summary-grid { grid-template-columns: repeat(4, 1fr); }
