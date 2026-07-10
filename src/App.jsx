@@ -962,6 +962,18 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
     return domain.careUpdateEnabled && !isPastThirtyDays(domain.careUpdateAt) ? 'yes' : 'no'
   }
 
+  function careUpdateHint(domain) {
+    if (!domain.careUpdateAt) return 'Date required'
+    return isPastThirtyDays(domain.careUpdateAt) ? 'Update required' : '30 day reminder'
+  }
+
+  function updateCareDate(domain, value) {
+    onUpdate(domain, {
+      careUpdateAt: value,
+      careUpdateEnabled: Boolean(value) && !isPastThirtyDays(value),
+    })
+  }
+
   return (
     <>
       <div className="website-filter-toolbar">
@@ -991,11 +1003,8 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
                 <div><a className="website-home-link" href={homepageUrl(domain)} target="_blank" rel="noreferrer">{domain.name}<Icon name="arrow" size={12} /></a><small>{domain.hosting}</small></div>
               </div>
               <div className="portfolio-control">
-                <select className={`inline-select ${careStatus(domain) === 'no' ? 'needs-update' : ''}`} value={careStatus(domain)} onChange={(event) => onUpdate(domain, { careUpdateEnabled: event.target.value === 'yes' })}>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-                <small>{domain.careUpdateAt ? `Last ${formatDate(dateInputValue(domain.careUpdateAt))}` : 'Default no'}</small>
+                <input className={careStatus(domain) === 'no' ? 'needs-update' : ''} type="date" value={dateInputValue(domain.careUpdateAt)} onChange={(event) => updateCareDate(domain, event.target.value)} />
+                <small>{careUpdateHint(domain)}</small>
               </div>
               <div className="portfolio-control">
                 <input className={isPastThirtyDays(domain.wordfenceDate) ? 'needs-update' : ''} type="date" value={dateInputValue(domain.wordfenceDate)} onChange={(event) => onUpdate(domain, { wordfenceDate: event.target.value })} />
@@ -1040,6 +1049,7 @@ function Portfolio({ domains, onUpdate, onEdit, onDelete, defaultDeveloper = 'Ma
           <DetailItem label="Hosting"><span className="hosting-badge">{selectedPortfolio.hosting}</span></DetailItem>
           <DetailItem label="Care update">{careStatus(selectedPortfolio) === 'yes' ? 'Yes' : 'No'}</DetailItem>
           <DetailItem label="Care update date">{selectedPortfolio.careUpdateAt ? formatDate(dateInputValue(selectedPortfolio.careUpdateAt)) : 'Default no'}</DetailItem>
+          <DetailItem label="Care reminder">{careUpdateHint(selectedPortfolio)}</DetailItem>
           <DetailItem label="Wordfence">{dateInputValue(selectedPortfolio.wordfenceDate) ? formatDate(dateInputValue(selectedPortfolio.wordfenceDate)) : 'Not set'}</DetailItem>
           <DetailItem label="Recaptcha">{selectedPortfolio.recaptchaEnabled ? 'Yes' : 'No'}</DetailItem>
           <DetailItem label="Backup">{selectedPortfolio.backupEnabled ? 'Yes' : 'No'}</DetailItem>
@@ -1451,7 +1461,7 @@ function App() {
         id: `care-update-${domain.id}-${dateInputValue(domain.careUpdateAt) || 'new'}`,
         type: 'warning',
         title: 'Website update required',
-        text: `${domain.name} care update is due. Mark it Yes after the website has been updated.`,
+        text: `${domain.name} care update date is over 30 days old. Select the latest update date after the website has been updated.`,
         time: 'Today',
         unread: true,
         targetPage: 'portfolio',

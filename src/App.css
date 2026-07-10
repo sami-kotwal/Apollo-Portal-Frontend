@@ -259,14 +259,14 @@ button { border: 0; }
   vertical-align: -2px;
 }
 .website-manager .table-row { grid-template-columns: 35px 2fr .7fr .8fr .9fr 58px 58px 145px; }
-.portfolio-manager .table-row { grid-template-columns: 35px 2fr 1fr 1fr .75fr 58px .8fr 120px; }
+.portfolio-manager .table-row { grid-template-columns: 35px 2fr 1.08fr 1fr .75fr 58px .8fr 120px; }
 .portfolio-summary-grid { grid-template-columns: repeat(4, 1fr); }
 .portfolio-count {
   height: 48px; padding: 0 14px; border: 1px solid rgba(92, 117, 174, .28); border-radius: 12px;
   display: flex; align-items: center; justify-content: center; color: #8190ae; background: #0a1530;
   font-size: 10px; font-weight: 700;
 }
-.portfolio-control { display: flex; flex-direction: column; gap: 5px; }
+.portfolio-control { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
 .portfolio-control small { color: #8796b6; font-size: 8px; }
 .portfolio-control input {
   width: 100%; height: 34px; padding: 0 9px; border: 1px solid rgba(92, 117, 174, .28); border-radius: 8px;
